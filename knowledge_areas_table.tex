@@ -1,0 +1,68 @@
+% Comprehensive IE Knowledge Areas Table
+% Insert this after line 143 (after the constraints section)
+
+\begin{table}[h]
+\centering
+\caption{The 13 Industrial Engineering Knowledge Areas Encoded in SynthIE's Knowledge Clusters}
+\label{tab:knowledge_areas}
+\small
+\begin{tabular}{@{}p{3.5cm}cp{4cm}p{5cm}@{}}
+\toprule
+\textbf{Knowledge Area} & \textbf{Cluster} & \textbf{Core Methodologies} & \textbf{Validation Requirement} \\ \midrule
+
+\multicolumn{4}{l}{\textit{Cluster A: Mathematical \& Economic Core (The Solver)}} \\
+\midrule
+
+Operations Research & A & Linear Programming (Simplex, Duality), Network Flows (CPM/PERT), Queuing Theory, Simulation (Monte Carlo, Discrete-Event) & Mathematical model with objective function and constraints; sensitivity analysis required \\
+\addlinespace
+
+Engineering Economic Analysis & A & Time Value of Money, NPV/IRR, Cash Flow Analysis, Depreciation, Replacement Analysis & Explicit cash flows with justified discount rate; minimum 10-year horizon for capital projects \\
+\addlinespace
+
+Information Engineering & A & Database Design (SQL, NoSQL), System Analysis (UML), Data Analytics (ML, Feature Engineering) & Data provenance documented; distinction between raw data and actionable information \\
+\midrule
+
+\multicolumn{4}{l}{\textit{Cluster B: Physical \& Production Core (The Builder)}} \\
+\midrule
+
+Design \& Manufacturing Engineering & B & Engineering Materials (atomic structures), Manufacturing Processes (Casting, Machining, Additive), Metrology (tolerances, limits, fits) & Material properties explicitly stated; manufacturing process selection justified by part geometry and production volume \\
+\addlinespace
+
+Facilities Engineering & B & Location Analysis, Systematic Layout Planning (SLP), Material Handling, Warehousing & Layout must minimize material handling cost; flow analysis with From-To charts \\
+\addlinespace
+
+Work Design \& Measurement & B & Time Study, Pre-Determined Time Systems (MTM, MOST), Work Sampling, Line Balancing & Standard times established; learning curve effects quantified \\
+\addlinespace
+
+Quality \& Reliability Engineering & B & Statistical Process Control (X-bar, R, p-charts), Design of Experiments (ANOVA, Taguchi), Reliability Analysis (Weibull, Exponential distributions) & Control charts for on-line quality; DOE for off-line quality; reliability calculated for system configurations \\
+\midrule
+
+\multicolumn{4}{l}{\textit{Cluster C: Operational \& Systemic Core (The Orchestrator)}} \\
+\midrule
+
+Operations Engineering \& Management & C & Forecasting, Aggregate Planning, Inventory Management (EOQ), Scheduling (Job Shop, Flow Shop), Project Management (PERT) & Forecast accuracy metrics reported; inventory policy mathematically formulated; critical path identified \\
+\addlinespace
+
+Supply Chain Management & C & Logistics (Vehicle Routing), Supplier Relationships, Supply Chain Network Design, Reverse Logistics & Entire value chain addressed; supplier selection criteria quantified; sustainability metrics included \\
+\addlinespace
+
+Product \& System Design & C & Needs Identification, Concept Generation, Feasibility Analysis, Systems Engineering (V\&V), Design for X (DFM, DFA, DFC) & Design alternatives compared; verification and validation plans specified \\
+\midrule
+
+\multicolumn{4}{l}{\textit{Cluster D: Human \& Social Core (The Steward)}} \\
+\midrule
+
+Ergonomics \& Human Factors & D & Anthropometry, Biomechanics (NIOSH Lifting Equation), Cognitive Ergonomics, Environmental Factors (Thermal, Noise, Lighting) & NIOSH analysis for manual handling; cognitive workload quantified; environmental standards (OSHA, ANSI) cited \\
+\addlinespace
+
+Safety Engineering & D & Hazard Recognition, OSHA Standards, Accident Causation Theories, Risk Assessment, Safety Management Systems & Hazards identified and categorized; risk assessment quantified (probability $\times$ severity); OSHA compliance documented \\
+\addlinespace
+
+Engineering Management & D & Strategic Management, HR Management (Motivation, Compensation), Leadership, Ethics, Change Management & Organizational context addressed; change management plan includes stakeholder analysis; ethical considerations explicit \\
+\addlinespace
+
+Social Systems Engineering & D & Heuristics for complex systems, Evolutionary design, Self-organization, Participatory methods & Recognition that social systems do not obey universal laws; solutions presented as strategies rather than optima; human agency preserved \\
+
+\bottomrule
+\end{tabular}
+\end{table}
