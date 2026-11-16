@@ -4,6 +4,7 @@
 
 > 📚 **Academic Purpose**: Automated, criterion-based feedback system for research papers based on ABET, IISE, ISO 9001, Six Sigma, and Industry 5.0 standards.
 
+🌐 **Live Demo / Aplicación en vivo:** [https://synthie.ai.studio/](https://synthie.ai.studio/)
 ---
 
 ## Quick Start
