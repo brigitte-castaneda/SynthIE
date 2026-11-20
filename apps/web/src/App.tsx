@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { analyzeDraft } from './services/geminiService';
-import { ClusterId, ResearchAnalysis } from './types';
+import { reviewDraft } from './api/client';
+import { ClusterId, ResearchAnalysis, DocumentInput } from '@synthie/contracts';
 import ClusterVisualizer from './components/ClusterVisualizer';
 import AnalysisDashboard from './components/AnalysisDashboard';
 import SimulationStep from './components/SimulationStep';
@@ -8,7 +8,7 @@ import { BrainCircuit, RotateCcw, Sparkles, Upload, FileText, X, SearchCheck } f
 
 function App() {
   const [context, setContext] = useState('');
-  const [file, setFile] = useState<{name: string, data: string, type: string} | null>(null);
+  const [file, setFile] = useState<{name: string, data: string, type: DocumentInput['mimeType']} | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [analysis, setAnalysis] = useState<ResearchAnalysis | null>(null);
   const [activeClusters, setActiveClusters] = useState<ClusterId[]>([]);
@@ -46,7 +46,7 @@ function App() {
         setFile({
           name: selectedFile.name,
           data: base64Data,
-          type: selectedFile.type
+          type: selectedFile.type as DocumentInput['mimeType']
         });
       };
       reader.readAsDataURL(selectedFile);
@@ -69,7 +69,10 @@ function App() {
     setActiveClusters([]);
 
     try {
-      const apiCallPromise = analyzeDraft(file.data, file.type, context);
+      const apiCallPromise = reviewDraft({
+        document: { name: file.name, mimeType: file.type, data: file.data },
+        context: context || undefined,
+      });
 
       // Simulation Timeline
       setTimeout(() => setSimStep(1), 1500);
@@ -87,12 +90,13 @@ function App() {
 
       setTimeout(() => setSimStep(3), 8500);
 
-      const data = await apiCallPromise;
+      const { analysis: data } = await apiCallPromise;
       setAnalysis(data);
       // Scrolling handled by useEffect
     } catch (error) {
       console.error(error);
-      alert("Failed to analyze draft. Please try again.");
+      const reason = error instanceof Error ? `\n\n${error.message}` : '';
+      alert(`Failed to analyze draft. Please try again.${reason}`);
     } finally {
       setIsGenerating(false);
       setSimStep(4);
@@ -268,11 +272,12 @@ function App() {
 
           </div>
         ) : (
-          <AnalysisDashboard 
-            analysis={analysis} 
-            fileData={file?.data || ''} 
-            mimeType={file?.type || ''} 
-          />
+          file && (
+            <AnalysisDashboard 
+              analysis={analysis} 
+              draft={{ name: file.name, mimeType: file.type, data: file.data }} 
+            />
+          )
         )}
       </main>
 

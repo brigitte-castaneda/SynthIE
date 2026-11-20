@@ -1,14 +1,12 @@
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { Send, Bot, User, Sparkles, Loader2, Paperclip, Image as ImageIcon, FileText, Trash2, Edit2, RotateCcw } from 'lucide-react';
-import { ResearchAnalysis } from '../types';
-import { createChatSession } from '../services/geminiService';
-import { Chat, Content, Part } from "@google/genai";
+import { ATTACHMENT_MIME_TYPES, ResearchAnalysis, DocumentInput, ChatTurn, Attachment } from '@synthie/contracts';
+import { sendChat } from '../api/client';
 import ReactMarkdown from 'react-markdown';
 
 interface ChatInterfaceProps {
   analysis: ResearchAnalysis;
-  fileData: string;
-  mimeType: string;
+  draft: DocumentInput;
 }
 
 export interface ChatInterfaceRef {
@@ -21,16 +19,45 @@ interface Message {
   role: 'user' | 'model';
   text: string;
   attachments?: { name: string, type: string, data: string }[];
+  /** UI-only error notice; never sent back to the model as history. */
+  isError?: boolean;
 }
 
-const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({ analysis, fileData, mimeType }, ref) => {
+const EXTENSION_MIME_TYPES: Record<string, string> = {
+  pdf: 'application/pdf',
+  txt: 'text/plain',
+  md: 'text/markdown',
+  tex: 'text/x-tex',
+};
+
+/** Browsers often report '' for .md/.tex; infer from the extension instead. */
+const resolveMimeType = (file: File): string => {
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  return file.type || EXTENSION_MIME_TYPES[ext] || 'application/octet-stream';
+};
+
+const isSupportedAttachment = (type: string): type is Attachment['mimeType'] =>
+  (ATTACHMENT_MIME_TYPES as readonly string[]).includes(type);
+
+/** Converts visible messages into provider-neutral chat turns for the API. */
+const toChatTurns = (messages: Message[]): ChatTurn[] =>
+  messages
+    .filter(m => m.id !== 'init' && !m.isError)
+    .map(m => ({
+      role: m.role,
+      text: m.text,
+      attachments: m.attachments
+        ?.filter(a => isSupportedAttachment(a.type))
+        .map(a => ({ name: a.name, mimeType: a.type as Attachment['mimeType'], data: a.data })),
+    }));
+
+const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({ analysis, draft }, ref) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attachment, setAttachment] = useState<{name: string, type: string, data: string} | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   
-  const chatSessionRef = useRef<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -64,32 +91,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({ analys
     }
   }, [analysis.title]);
 
-  // Initialize Chat Session (Context Aware)
-  useEffect(() => {
-    const initChat = async () => {
-      try {
-        // Convert visible messages back to SDK Content format for history restoration
-        // We skip the 'init' message as that's purely UI
-        const historyContent: Content[] = messages
-          .filter(m => m.id !== 'init')
-          .map(m => ({
-            role: m.role,
-            parts: [
-              { text: m.text },
-              ...(m.attachments?.map(a => ({ inlineData: { mimeType: a.type, data: a.data } })) || [])
-            ]
-          }));
-
-        chatSessionRef.current = await createChatSession(analysis, fileData, mimeType, historyContent);
-      } catch (e) {
-        console.error("Failed to init chat", e);
-      }
-    };
-    
-    // Only init if we have messages loaded (or empty)
-    initChat();
-  }, [analysis, fileData, mimeType, messages.length]); // Re-init if message history drastically changes (like rewind)
-
   // Save to LocalStorage on change
   useEffect(() => {
     if (messages.length > 0) {
@@ -108,13 +109,19 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({ analys
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      const type = resolveMimeType(file);
+      if (!isSupportedAttachment(type)) {
+        alert("Unsupported file type. Attach a PDF, TXT, Markdown, LaTeX, or image file.");
+        e.target.value = '';
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64String = event.target?.result as string;
         const base64Data = base64String.split(',')[1];
         setAttachment({
           name: file.name,
-          type: file.type,
+          type,
           data: base64Data
         });
       };
@@ -144,9 +151,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({ analys
       const index = messages.findIndex(m => m.id === editingId);
       if (index !== -1) {
         newHistory = messages.slice(0, index);
-        // We need to re-init the chat session with this truncated history effectively
-        // The useEffect dependency on messages.length helps, but strictly we should force re-creation
-        chatSessionRef.current = null; 
       }
       setEditingId(null);
     }
@@ -164,40 +168,30 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({ analys
     setIsLoading(true);
 
     try {
-      // Re-init session if it was cleared (edit mode) or null
-      if (!chatSessionRef.current) {
-        const historyContent: Content[] = newHistory
-          .filter(m => m.id !== 'init')
-          .map(m => ({
-            role: m.role,
-            parts: [
-              { text: m.text },
-              ...(m.attachments?.map(a => ({ inlineData: { mimeType: a.type, data: a.data } })) || [])
-            ]
-          }));
-        chatSessionRef.current = await createChatSession(analysis, fileData, mimeType, historyContent);
-      }
-
-      const parts: Part[] = [{ text: textToSend }];
-      if (attachment) {
-        parts.push({ inlineData: { mimeType: attachment.type, data: attachment.data } });
-      }
-
-      const result = await chatSessionRef.current.sendMessage({ 
-        message: parts
+      const [message] = toChatTurns([userMsg]);
+      const { reply } = await sendChat({
+        analysis,
+        document: draft,
+        history: toChatTurns(newHistory),
+        message: { ...message, role: 'user' },
       });
 
-      const responseText = result.text || '';
-      
       const botMsg: Message = { 
         id: (Date.now() + 1).toString(), 
         role: 'model', 
-        text: responseText 
+        text: reply 
       };
       setMessages(prev => [...prev, botMsg]);
 
     } catch (error) {
       console.error("Chat error", error);
+      const reason = error instanceof Error ? error.message : 'Unknown error';
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'model',
+        text: `**The council could not respond.** ${reason}`,
+        isError: true,
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -220,7 +214,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({ analys
             if (confirm("Clear chat history for this paper?")) {
               localStorage.removeItem(`chat_history_${analysis.title}`);
               setMessages([{ id: 'init', role: 'model', text: "History cleared. Ready for new questions." }]);
-              chatSessionRef.current = null;
             }
           }}
           className="text-xs text-slate-500 hover:text-red-400 transition-colors flex items-center gap-1"

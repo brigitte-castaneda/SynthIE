@@ -1,4 +1,4 @@
-import { ClusterDef, ClusterId } from './types';
+import { ClusterDef, ClusterId } from '@synthie/contracts';
 import { Calculator, Hammer, Network, Users } from 'lucide-react';
 import React from 'react';
 

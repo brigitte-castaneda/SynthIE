@@ -1,0 +1,23 @@
+{
+  "name": "@synthie/api",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "SynthIE backend: holds provider credentials, assembles prompts, calls the configured LLM provider, and validates results.",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@google/genai": "^1.40.0",
+    "@synthie/contracts": "*",
+    "unpdf": "1.9.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "tsx": "^4.19.2",
+    "typescript": "~5.8.2"
+  }
+}

@@ -3,22 +3,19 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "react": "^19.2.4",
-    "lucide-react": "^0.563.0",
-    "@google/genai": "^1.40.0",
-    "react-dom": "^19.2.4",
-    "react-markdown": "^10.1.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "dev": "npm run dev -w @synthie/web",
+    "dev:api": "npm run dev -w @synthie/api",
+    "build": "npm run build --workspaces --if-present && npm run check:secrets",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "preview": "npm run preview -w @synthie/web",
+    "check:secrets": "node scripts/check-bundle-secrets.mjs"
   }
 }

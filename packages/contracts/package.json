@@ -1,0 +1,16 @@
+{
+  "name": "@synthie/contracts",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Provider-neutral domain types shared by the SynthIE web app and API.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  }
+}

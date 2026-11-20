@@ -1,12 +1,11 @@
 import React, { useRef } from 'react';
-import { ResearchAnalysis, ClusterId } from '../types';
+import { ResearchAnalysis, ClusterId, DocumentInput } from '@synthie/contracts';
 import { AlertCircle, CheckCircle, TrendingUp, BookOpen, PenTool, Brain, ChevronDown, ChevronUp, MessageSquare, Download, ArrowRight } from 'lucide-react';
 import ChatInterface, { ChatInterfaceRef } from './ChatInterface';
 
 interface AnalysisDashboardProps {
   analysis: ResearchAnalysis;
-  fileData: string;
-  mimeType: string;
+  draft: DocumentInput;
 }
 
 const generateHTMLReport = (analysis: ResearchAnalysis) => {
@@ -251,7 +250,7 @@ const SectionCard: React.FC<{
   );
 };
 
-const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({ analysis, fileData, mimeType }) => {
+const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({ analysis, draft }) => {
   const chatRef = useRef<ChatInterfaceRef>(null);
 
   const handleDiscuss = (text: string) => {
@@ -429,8 +428,7 @@ const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({ analysis, fileDat
         <ChatInterface 
           ref={chatRef} 
           analysis={analysis} 
-          fileData={fileData} 
-          mimeType={mimeType} 
+          draft={draft} 
         />
       </div>
 

@@ -90,26 +90,34 @@ SynthIE evaluates papers using four specialized "clusters" that represent differ
 
 ```
 synthie/
-├── App.tsx                      # Main application component
-├── index.tsx                    # Application entry point
-├── index.html                   # HTML template
-├── package.json                 # Dependencies and scripts
-├── vite.config.ts              # Build configuration
-├── tsconfig.json               # TypeScript configuration
-├── .env.local                  # Environment variables (API keys)
+├── package.json                 # npm workspaces root (dev/build/typecheck scripts)
+├── tsconfig.base.json           # Shared TypeScript settings
+├── .env.example                 # Copy to .env.local (never committed)
 │
-├── components/                 # React components
-│   ├── AnalysisDashboard.tsx   # Main results display
-│   ├── ChatInterface.tsx       # Interactive Q&A
-│   ├── ClusterVisualizer.tsx   # Visual representation of 4 pillars
-│   ├── SimulationStep.tsx      # Processing animation
-│   └── ResearchResultView.tsx  # Result formatting
+├── apps/
+│   ├── web/                     # React + Vite frontend
+│   │   ├── index.html
+│   │   ├── vite.config.ts       # Dev server, /api proxy, env loading
+│   │   ├── tailwind.config.ts   # Tailwind theme (built at compile time)
+│   │   └── src/
+│   │       ├── index.tsx        # Entry point
+│   │       ├── index.css        # Tailwind + global styles
+│   │       ├── App.tsx          # Main application
+│   │       ├── constants.tsx    # Cluster definitions
+│   │       ├── components/      # AnalysisDashboard, ChatInterface, ...
+│   │       └── api/client.ts    # Only route to the backend (no SDK, no key)
+│   └── api/                     # Node backend: owns keys, prompts, model calls
+│       └── src/
+│           ├── server.ts        # Entry point
+│           ├── config.ts        # Env validation (LLM_PROVIDER, keys, limits)
+│           ├── http/            # Routes, validation, rate limit, error mapping
+│           ├── services/        # reviewService, chatService
+│           ├── prompts/         # Versioned prompts + analysis JSON Schema
+│           └── llm/             # LlmProvider port + gemini / ollama adapters
 │
-├── services/                   # Business logic
-│   └── geminiService.ts        # AI service integration
-│
-├── types.ts                    # TypeScript type definitions
-└── constants.tsx               # Application constants (cluster definitions)
+└── packages/
+    └── contracts/               # Shared domain types (ResearchAnalysis, ClusterId, ...)
+        └── src/index.ts
 ```
 
 ---
@@ -410,10 +418,11 @@ npm --version
 #### 4.2 Configure Environment Variables
 
 1. Open the `synthie` folder
-2. Find the file named `.env.local`
+2. Copy `.env.example` to a new file named `.env.local` in the same folder
 3. Open it with a text editor (Notepad on Windows, TextEdit on Mac)
-4. Replace `PLACEHOLDER_API_KEY` with your actual Gemini API key:
+4. Set your Gemini API key (it is used only by the API server, never sent to the browser):
    ```
+   LLM_PROVIDER=gemini
    GEMINI_API_KEY=AIzaSyD...your-actual-key-here
    ```
 5. Save the file
@@ -449,7 +458,14 @@ npm --version
 
 #### 5.1 Start the Development Server
 
-In your Command Prompt or Terminal (in the synthie folder), run:
+SynthIE has two parts that both need to run. In one Command Prompt or Terminal
+(in the synthie folder), start the API server:
+
+```bash
+npm run dev:api
+```
+
+In a second terminal, start the web app:
 
 ```bash
 npm run dev
@@ -572,216 +588,34 @@ ollama pull deepseek-r1
    - You should get a response
    - Type `/exit` to quit
 
-### Step 4: Modify the Application for Ollama
+### Step 4: Configure SynthIE for Ollama
 
-You need to update the application code to use Ollama instead of Gemini.
+No code changes are needed. In `.env.local` at the root of the synthie folder, set:
 
-#### 4.1 Update `geminiService.ts`
-
-1. Open `services/geminiService.ts` in a text editor
-2. Replace the entire file with the following code:
-
-```typescript
-import { ResearchAnalysis } from "../types";
-
-// Ollama API configuration
-const OLLAMA_BASE_URL = 'http://localhost:11434';
-const MODEL_NAME = 'llama3.2'; // Change to 'gemma2' or 'deepseek-r1' if you downloaded those
-
-const SYSTEM_INSTRUCTION = `
-You are the "Grand Council of Industrial Engineering," a high-level automated review board.
-Your purpose is to critique "Advanced Working Papers" against the "IE Gold Standard".
-
-Your Architecture (The 4 Pillars):
-1. Cluster A (Math/Econ): Checks mathematical rigor, optimization models, financial validity.
-2. Cluster B (Physical): Checks manufacturing realism, physics, layout, material flow.
-3. Cluster C (Operational): Checks logic, supply chain dynamics, system integration.
-4. Cluster D (Human/Social): Checks ergonomics, safety, ethics, management impact.
-
-You do NOT generate new papers. You ANALYZE, SCORE, and CRITIQUE existing drafts.
-Your feedback must be brutally honest but constructive. High scores (>90) are reserved for publishable quality.
-`;
-
-// Helper function to call Ollama API
-async function callOllama(prompt: string, systemPrompt: string = SYSTEM_INSTRUCTION): Promise<string> {
-  const response = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: MODEL_NAME,
-      prompt: `${systemPrompt}\n\nUser: ${prompt}`,
-      stream: false,
-      options: {
-        temperature: 0.2,
-        num_predict: 4096,
-      }
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Ollama API error: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  return data.response;
-}
-
-// Helper function to extract text from base64 PDF/TXT
-function extractTextFromBase64(fileBase64: string, mimeType: string): string {
-  // For TXT files, decode base64
-  if (mimeType === 'text/plain') {
-    const decoded = atob(fileBase64);
-    return decoded;
-  }
-  
-  // For PDF files, we need to inform the user that PDF parsing is limited
-  // In a production environment, you'd use a PDF parsing library
-  return "[PDF content - Ollama cannot directly parse PDFs. Please convert to TXT or use a PDF parser]";
-}
-
-export const analyzeDraft = async (
-  fileBase64: string, 
-  mimeType: string, 
-  context?: string
-): Promise<ResearchAnalysis> => {
-  
-  // Extract text from file
-  const documentText = extractTextFromBase64(fileBase64, mimeType);
-  
-  const prompt = `
-  Analyze the following research draft.
-  Context from Author: "${context || 'None'}".
-
-  DOCUMENT CONTENT:
-  ${documentText.substring(0, 15000)} 
-  
-  Please provide a detailed analysis in the following JSON format:
-  {
-    "title": "Title of the paper",
-    "topicInference": "What is this paper about?",
-    "overallScore": <number 0-100>,
-    "clusterScores": {
-      "Cluster A": <number 0-100>,
-      "Cluster B": <number 0-100>,
-      "Cluster C": <number 0-100>,
-      "Cluster D": <number 0-100>
-    },
-    "writingStyle": {
-      "tone": "e.g., Academic, Casual, Technical",
-      "clarityScore": <number 0-100>,
-      "grammarScore": <number 0-100>,
-      "voiceCritique": "Comment on writing quality"
-    },
-    "holisticFeedback": "Overall assessment and main recommendations",
-    "sectionAnalysis": [
-      {
-        "title": "Section name (e.g., Abstract, Methodology)",
-        "score": <number 0-100>,
-        "summary": "Brief summary of this section",
-        "strengths": ["strength 1", "strength 2"],
-        "weaknesses": ["weakness 1", "weakness 2"],
-        "improvementAdvice": "Specific advice for improvement"
-      }
-    ],
-    "keyMissedReferences": ["Missing theory 1", "Missing standard 2"]
-  }
-
-  IMPORTANT: Return ONLY valid JSON, no additional text.
-  `;
-
-  try {
-    const response = await callOllama(prompt);
-    
-    // Extract JSON from response (sometimes models add extra text)
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("Failed to extract JSON from response");
-    }
-    
-    const analysis = JSON.parse(jsonMatch[0]) as ResearchAnalysis;
-    return analysis;
-    
-  } catch (error) {
-    console.error("Ollama API Error:", error);
-    throw error;
-  }
-};
-
-// Chat session for Ollama
-export const createChatSession = async (
-  analysis: ResearchAnalysis,
-  fileBase64: string,
-  mimeType: string,
-  restoredHistory?: any[]
-) => {
-  const documentText = extractTextFromBase64(fileBase64, mimeType);
-  
-  // Simple chat implementation
-  return {
-    sendMessage: async (userMessage: string) => {
-      const chatPrompt = `
-      You are the Grand Council of Industrial Engineering. You have analyzed this paper:
-      
-      PAPER EXCERPT: ${documentText.substring(0, 5000)}
-      
-      ANALYSIS SUMMARY: ${JSON.stringify(analysis)}
-      
-      User Question: ${userMessage}
-      
-      Provide a helpful, specific response to improve their paper.
-      `;
-      
-      const response = await callOllama(chatPrompt);
-      return {
-        candidates: [{
-          content: {
-            parts: [{ text: response }]
-          }
-        }]
-      };
-    }
-  };
-};
+```
+LLM_PROVIDER=ollama
+LLM_MODEL=llama3.2
 ```
 
-#### 4.2 Important Notes for PDF Support
+Optional: `OLLAMA_BASE_URL` (default `http://localhost:11434`) and `OLLAMA_NUM_CTX`
+(default `32768`) for longer papers. See [SWITCHING_GUIDE.md](./SWITCHING_GUIDE.md).
 
-> ⚠️ **PDF Limitation**: The code above has limited PDF support. For best results with Ollama:
-> 
-> **Option 1**: Convert your PDF to TXT before uploading
-> - Use online tools like [PDF to Text](https://www.pdftotext.com/)
-> - Or use Adobe Acrobat: File → Export To → Text
->
-> **Option 2**: Install a PDF parsing library (Advanced)
-> ```bash
-> npm install pdf-parse
-> ```
-> Then modify the `extractTextFromBase64` function to use `pdf-parse`.
-
-### Step 5: Update Environment Variables
-
-1. Open `.env.local`
-2. You can leave it as is (API key won't be used) or add:
-   ```
-   OLLAMA_API_URL=http://localhost:11434
-   ```
-
-### Step 6: Install Dependencies and Run
+### Step 5: Install Dependencies and Run
 
 ```bash
-# Install dependencies
 npm install
 
-# Start the application
+# Terminal 1: API server (talks to Ollama)
+npm run dev:api
+
+# Terminal 2: web app
 npm run dev
 ```
 
 ### Step 7: Test with Ollama
 
 1. Open browser: `http://localhost:3000`
-2. Upload a **TXT file** (or converted PDF)
+2. Upload a TXT or PDF file (PDF text is extracted on the server)
 3. Click "Start Analysis"
 4. Wait for analysis (may take 1-3 minutes with Ollama)
 
@@ -907,7 +741,7 @@ After receiving your analysis, you can ask questions like:
 #### Port 3000 already in use
 
 **Solution**:
-1. Edit `vite.config.ts`
+1. Edit `apps/web/vite.config.ts`
 2. Change port number:
    ```typescript
    server: {
@@ -955,7 +789,7 @@ A:
 - **Ollama**: Run `ollama pull <model-name>` to get the latest version
 
 **Q: Can I use multiple models with Ollama?**  
-A: Yes! Download multiple models and switch between them by changing `MODEL_NAME` in `geminiService.ts`.
+A: Yes! Download multiple models and switch between them by changing `LLM_MODEL` in `.env.local` and restarting `npm run dev:api`.
 
 **Q: How much does Gemini API cost?**  
 A: As of 2026, Gemini pricing is approximately:

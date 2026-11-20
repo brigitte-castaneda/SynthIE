@@ -15,10 +15,11 @@
 # 1. Install dependencies
 npm install
 
-# 2. Add your Gemini API key to .env.local
-GEMINI_API_KEY=your-api-key-here
+# 2. Create .env.local at the repository root (see .env.example)
+cp .env.example .env.local   # then set GEMINI_API_KEY
 
-# 3. Run the application
+# 3. Run the API (:8787) and the web app (:3000) in two terminals
+npm run dev:api
 npm run dev
 
 # 4. Open http://localhost:3000
@@ -31,8 +32,9 @@ npm run dev
 # 2. Download a model
 ollama pull llama3.2
 
-# 3. Modify services/geminiService.ts (see DEPLOYMENT_GUIDE.md)
-# 4. Run the application
+# 3. In .env.local set:  LLM_PROVIDER=ollama   (and optionally LLM_MODEL=llama3.2)
+# 4. Run the API and the web app (two terminals)
+npm run dev:api
 npm run dev
 ```
 
@@ -69,9 +71,12 @@ SynthIE is an automated editorial board that evaluates Industrial Engineering re
 └────────────────────────┬────────────────────────────────┘
                          │
                          ▼
+                         │  HTTPS /api (JSON)
+                         ▼
 ┌─────────────────────────────────────────────────────────┐
-│              Service Layer (TypeScript)                  │
-│                  geminiService.ts                        │
+│                 API server (apps/api)                    │
+│  validation · prompts · rate limit · secrets · logging   │
+│          LlmProvider port (LLM_PROVIDER=...)             │
 └────────────────────────┬────────────────────────────────┘
                          │
             ┌────────────┴────────────┐
@@ -86,18 +91,34 @@ SynthIE is an automated editorial board that evaluates Industrial Engineering re
 
 ```
 synthie/
-├── App.tsx                    # Main application logic
-├── index.tsx                  # Entry point
-├── components/                # React components
-│   ├── AnalysisDashboard.tsx  # Results display
-│   ├── ChatInterface.tsx      # Interactive Q&A
-│   ├── ClusterVisualizer.tsx  # 4 Pillars visualization
-│   └── SimulationStep.tsx     # Processing animation
-├── services/
-│   └── geminiService.ts       # AI integration (Gemini/Ollama)
-├── types.ts                   # TypeScript definitions
-├── constants.tsx              # Cluster definitions
-└── .env.local                 # API configuration
+├── package.json                 # npm workspaces root (dev/build/typecheck scripts)
+├── tsconfig.base.json           # Shared TypeScript settings
+├── .env.example                 # Copy to .env.local (never committed)
+│
+├── apps/
+│   ├── web/                     # React + Vite frontend
+│   │   ├── index.html
+│   │   ├── vite.config.ts       # Dev server, /api proxy, env loading
+│   │   ├── tailwind.config.ts   # Tailwind theme (built at compile time)
+│   │   └── src/
+│   │       ├── index.tsx        # Entry point
+│   │       ├── index.css        # Tailwind + global styles
+│   │       ├── App.tsx          # Main application
+│   │       ├── constants.tsx    # Cluster definitions
+│   │       ├── components/      # AnalysisDashboard, ChatInterface, ...
+│   │       └── api/client.ts    # Only route to the backend (no SDK, no key)
+│   └── api/                     # Node backend: owns keys, prompts, model calls
+│       └── src/
+│           ├── server.ts        # Entry point
+│           ├── config.ts        # Env validation (LLM_PROVIDER, keys, limits)
+│           ├── http/            # Routes, validation, rate limit, error mapping
+│           ├── services/        # reviewService, chatService
+│           ├── prompts/         # Versioned prompts + analysis JSON Schema
+│           └── llm/             # LlmProvider port + gemini / ollama adapters
+│
+└── packages/
+    └── contracts/               # Shared domain types (ResearchAnalysis, ClusterId, ...)
+        └── src/index.ts
 ```
 
 ---
@@ -199,14 +220,22 @@ The comprehensive guide includes:
 
 ## Environment Variables
 
-Create a `.env.local` file:
+Create a `.env.local` file at the repository root (copy `.env.example`):
+
+> 🔒 Provider keys are read **only** by `apps/api`; the browser bundle contains no
+> credentials, prompts, or provider SDK. `npm run build` fails if a key leaks into it.
+> The API has a basic per-client rate limit but **no user authentication yet**, so do
+> not expose it publicly without putting access control in front of it.
 
 ```bash
-# For Google Cloud (Gemini)
+# Provider: gemini (default) or ollama
+LLM_PROVIDER=gemini
 GEMINI_API_KEY=your-api-key-here
 
-# For Ollama (optional)
-OLLAMA_API_URL=http://localhost:11434
+# For Ollama
+# LLM_PROVIDER=ollama
+# LLM_MODEL=llama3.2
+# OLLAMA_BASE_URL=http://localhost:11434
 ```
 
 ---
@@ -250,11 +279,11 @@ For more troubleshooting, see [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md#troubl
 ## Technology Stack
 
 - **Frontend**: React 19, TypeScript, Vite
-- **Styling**: Tailwind CSS (via inline classes)
+- **Styling**: Tailwind CSS 3 (compiled at build time)
 - **Icons**: Lucide React
 - **AI Integration**: 
-  - Google Generative AI SDK (`@google/genai`)
-  - Ollama REST API (alternative)
+  - Server-side provider adapters (`apps/api/src/llm`): Gemini via `@google/genai`, Ollama REST API
+  - Runtime validation with zod (`packages/contracts`)
 - **Markdown Rendering**: react-markdown
 
 ---
@@ -265,8 +294,14 @@ For more troubleshooting, see [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md#troubl
 # Install dependencies
 npm install
 
-# Run development server
+# Run the frontend dev server (proxies /api to the backend)
 npm run dev
+
+# Run the backend
+npm run dev:api
+
+# Typecheck every workspace
+npm run typecheck
 
 # Build for production
 npm run build

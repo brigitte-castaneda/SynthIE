@@ -27,8 +27,8 @@ Welcome to the SynthIE documentation! This index helps you find the right guide 
 
 | File | Purpose | Who Should Read |
 |------|---------|-----------------|
-| **[services/geminiService.ts](./services/geminiService.ts)** | Google Gemini integration (default) | Developers |
-| **[services/geminiService.ollama.ts](./services/geminiService.ollama.ts)** | Ollama integration (alternative) | Users deploying locally |
+| **[apps/api/src/llm/gemini.ts](./apps/api/src/llm/gemini.ts)** | Google Gemini adapter (default) | Developers |
+| **[apps/api/src/llm/ollama.ts](./apps/api/src/llm/ollama.ts)** | Ollama adapter (local models) | Users deploying locally |
 | **[architecture_diagram.png](./architecture_diagram.png)** | Visual system architecture | Everyone |
 
 ---
@@ -124,26 +124,34 @@ Welcome to the SynthIE documentation! This index helps you find the right guide 
 ### File Structure
 ```
 synthie/
-├── README.md                          # Quick start
-├── DEPLOYMENT_GUIDE.md                # Full deployment guide
-├── SWITCHING_GUIDE.md                 # Backend switching guide
-├── DOCUMENTATION_INDEX.md             # This file
-├── architecture_diagram.png           # System architecture
+├── package.json                 # npm workspaces root (dev/build/typecheck scripts)
+├── tsconfig.base.json           # Shared TypeScript settings
+├── .env.example                 # Copy to .env.local (never committed)
 │
-├── App.tsx                            # Main application
-├── components/                        # React components
-│   ├── AnalysisDashboard.tsx
-│   ├── ChatInterface.tsx
-│   ├── ClusterVisualizer.tsx
-│   └── SimulationStep.tsx
+├── apps/
+│   ├── web/                     # React + Vite frontend
+│   │   ├── index.html
+│   │   ├── vite.config.ts       # Dev server, /api proxy, env loading
+│   │   ├── tailwind.config.ts   # Tailwind theme (built at compile time)
+│   │   └── src/
+│   │       ├── index.tsx        # Entry point
+│   │       ├── index.css        # Tailwind + global styles
+│   │       ├── App.tsx          # Main application
+│   │       ├── constants.tsx    # Cluster definitions
+│   │       ├── components/      # AnalysisDashboard, ChatInterface, ...
+│   │       └── api/client.ts    # Only route to the backend (no SDK, no key)
+│   └── api/                     # Node backend: owns keys, prompts, model calls
+│       └── src/
+│           ├── server.ts        # Entry point
+│           ├── config.ts        # Env validation (LLM_PROVIDER, keys, limits)
+│           ├── http/            # Routes, validation, rate limit, error mapping
+│           ├── services/        # reviewService, chatService
+│           ├── prompts/         # Versioned prompts + analysis JSON Schema
+│           └── llm/             # LlmProvider port + gemini / ollama adapters
 │
-├── services/                          # Business logic
-│   ├── geminiService.ts               # Gemini integration (active)
-│   └── geminiService.ollama.ts        # Ollama integration (reference)
-│
-├── types.ts                           # TypeScript types
-├── constants.tsx                      # App constants
-└── .env.local                         # Environment variables
+└── packages/
+    └── contracts/               # Shared domain types (ResearchAnalysis, ClusterId, ...)
+        └── src/index.ts
 ```
 
 ### Key Technologies
@@ -198,10 +206,10 @@ Analysis Tool for Industrial Engineering Education.
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| Main App | `App.tsx` | Application logic, state management |
-| Analysis Display | `components/AnalysisDashboard.tsx` | Shows results |
-| Chat | `components/ChatInterface.tsx` | Interactive Q&A |
-| AI Service | `services/geminiService.ts` | AI integration |
+| Main App | `apps/web/src/App.tsx` | Application logic, state management |
+| Analysis Display | `apps/web/src/components/AnalysisDashboard.tsx` | Shows results |
+| Chat | `apps/web/src/components/ChatInterface.tsx` | Interactive Q&A |
+| AI Service | `apps/api/src/services/` + `apps/api/src/llm/` | Prompts, validation, provider adapters |
 
 ### Understanding the AI
 

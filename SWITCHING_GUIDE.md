@@ -8,11 +8,11 @@ This guide shows you how to switch between Google Gemini (cloud) and Ollama (loc
 
 Your application is currently configured to use **Google Gemini API**.
 
-**Files in use:**
-- `services/geminiService.ts` - Gemini integration
+The provider is chosen by configuration in `.env.local` at the repository root and
+used only by the API server (`apps/api`). No code changes are needed to switch.
 
 **Required:**
-- `.env.local` with `GEMINI_API_KEY=your-key`
+- `.env.local` with `LLM_PROVIDER=gemini` and `GEMINI_API_KEY=your-key`
 - Internet connection
 - Google Cloud account
 
@@ -59,57 +59,46 @@ ollama serve
 
 Keep this terminal window open while using the application.
 
-### Step 4: Replace the Service File
+### Step 4: Point the API at Ollama
 
-**Option A: Rename files (Recommended)**
-```bash
-# Backup original Gemini service
-mv services/geminiService.ts services/geminiService.backup.ts
-
-# Use Ollama version
-mv services/geminiService.ollama.ts services/geminiService.ts
-```
-
-**Option B: Manual replacement**
-1. Delete `services/geminiService.ts`
-2. Rename `services/geminiService.ollama.ts` to `services/geminiService.ts`
-
-### Step 5: Update Model Name (if needed)
-
-Edit `services/geminiService.ts` (now the Ollama version):
-
-```typescript
-// Line 23 - Change model name if you downloaded a different model
-const MODEL_NAME = 'llama3.2'; // or 'gemma2' or 'deepseek-r1'
-```
-
-### Step 6: Restart Application
+Edit `.env.local` at the repository root:
 
 ```bash
-# Stop the current server (Ctrl+C)
-# Then restart
-npm run dev
+LLM_PROVIDER=ollama
+LLM_MODEL=llama3.2            # or gemma2, deepseek-r1, ... (must be pulled)
+# OLLAMA_BASE_URL=http://localhost:11434
+# OLLAMA_NUM_CTX=32768        # context window; larger handles longer papers
 ```
 
-### Step 7: Test
+### Step 5: Restart the API
+
+```bash
+npm run dev:api   # terminal 1; logs "provider=ollama, model=..."
+npm run dev       # terminal 2
+```
+
+`curl http://localhost:8787/api/health` reports the active provider and model.
+
+### Step 6: Test
 
 1. Go to `http://localhost:3000`
-2. Upload a **TXT file** (PDF support is limited with Ollama)
-3. Click "Start Analysis"
-4. Wait 1-3 minutes for results
+2. Upload a PDF or TXT file. The API extracts PDF text server-side, since Ollama
+   has no native PDF input (scanned PDFs without a text layer will not work).
+3. Click "Start Analysis" and wait (local models are slower).
 
 ---
 
 ## How to Switch Back to Gemini
 
-```bash
-# Restore original Gemini service
-mv services/geminiService.ts services/geminiService.ollama.ts
-mv services/geminiService.backup.ts services/geminiService.ts
+Set `LLM_PROVIDER=gemini` (and `GEMINI_API_KEY`) in `.env.local`, then restart `npm run dev:api`.
 
-# Restart
-npm run dev
-```
+---
+
+## Adding Another Provider
+
+Implement the `LlmProvider` interface in `apps/api/src/llm/types.ts` as a new adapter
+next to `gemini.ts` and `ollama.ts`, then register it in `apps/api/src/llm/index.ts`
+and `apps/api/src/config.ts`. The frontend does not change.
 
 ---
 
@@ -118,7 +107,7 @@ npm run dev
 | Feature | Gemini | Ollama |
 |---------|--------|--------|
 | **Setup Time** | 5 minutes | 15-30 minutes |
-| **File Support** | PDF + TXT | TXT (PDF limited) |
+| **File Support** | PDF + TXT (native) | TXT + PDF (text extracted on server) |
 | **Analysis Speed** | 30-60 seconds | 1-3 minutes |
 | **Quality** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
 | **Cost** | $0.001/1K chars | Free |
@@ -155,43 +144,22 @@ ollama pull llama3.2
 # Use smaller model
 ollama pull gemma2
 
-# Then update MODEL_NAME in geminiService.ts
+# Then set LLM_MODEL=gemma2 in .env.local and restart npm run dev:api
 ```
 
 ### PDF Not Working
 
-**Solution:** Convert PDF to TXT before uploading
-- Use [pdftotext.com](https://www.pdftotext.com/)
-- Or Adobe Acrobat: File → Export To → Text
+The API extracts PDF text on the server. If a PDF is scanned (images only, no text
+layer), extraction yields nothing useful: run OCR first or upload a TXT export.
 
 ---
 
-## Advanced: Using Both Simultaneously
+## Advanced: Running Both
 
-You can create a toggle in the UI to switch between backends:
-
-1. Keep both service files:
-   - `services/geminiService.gemini.ts`
-   - `services/geminiService.ollama.ts`
-
-2. Create a wrapper in `services/geminiService.ts`:
-
-```typescript
-// services/geminiService.ts
-const USE_OLLAMA = process.env.USE_OLLAMA === 'true';
-
-if (USE_OLLAMA) {
-  export * from './geminiService.ollama';
-} else {
-  export * from './geminiService.gemini';
-}
-```
-
-3. Toggle in `.env.local`:
-```bash
-USE_OLLAMA=false  # Use Gemini
-# USE_OLLAMA=true  # Use Ollama
-```
+The provider is a server setting, so the simplest way to compare them is two API
+instances on different ports, e.g. `LLM_PROVIDER=ollama API_PORT=8788 npm run dev:api`.
+Every response includes `meta.provider`, `meta.model`, and `meta.promptVersion`
+so results from each run can be told apart.
 
 ---
 

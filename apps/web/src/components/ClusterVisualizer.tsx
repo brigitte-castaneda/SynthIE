@@ -1,6 +1,6 @@
 import React from 'react';
 import { CLUSTERS, CLUSTER_ICONS } from '../constants';
-import { ClusterId } from '../types';
+import { ClusterId } from '@synthie/contracts';
 
 interface ClusterVisualizerProps {
   activeClusters?: ClusterId[];
