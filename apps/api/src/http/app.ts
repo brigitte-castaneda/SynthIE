@@ -34,7 +34,14 @@ const LLM_STATUS: Record<LlmError['code'], number> = {
   provider_unavailable: 502,
 };
 
-export function createApp(config: AppConfig, provider: LlmProvider) {
+export interface Logger {
+  info(message: string): void;
+  error(message: string, ...detail: unknown[]): void;
+}
+
+const consoleLogger: Logger = { info: (m) => console.log(m), error: (m, ...d) => console.error(m, ...d) };
+
+export function createApp(config: AppConfig, provider: LlmProvider, logger: Logger = consoleLogger) {
   const limiter = new RateLimiter(config.rateLimit.max, config.rateLimit.windowMs);
 
   /** Runs a model-backed operation with a deadline that also ends if the client disconnects. */
@@ -87,12 +94,12 @@ export function createApp(config: AppConfig, provider: LlmProvider) {
       const result = await route(req, res);
       sendJson(res, 200, result);
     } catch (error) {
-      const { httpStatus, body, headers } = toErrorResponse(error);
+      const { httpStatus, body, headers } = toErrorResponse(error, logger);
       status = httpStatus;
       if (!res.headersSent && !res.destroyed) sendJson(res, httpStatus, body, headers);
     } finally {
       // Metadata only: never log document contents, prompts, or model output.
-      console.log(
+      logger.info(
         JSON.stringify({ at: new Date().toISOString(), route: routeKey, status, ms: Date.now() - started, provider: provider.name }),
       );
     }
@@ -134,15 +141,15 @@ async function readJson<T>(req: IncomingMessage, schema: ZodType<T>): Promise<T>
   return parsed.data;
 }
 
-function toErrorResponse(error: unknown): { httpStatus: number; body: ApiErrorBody; headers?: Record<string, string> } {
+function toErrorResponse(error: unknown, logger: Logger): { httpStatus: number; body: ApiErrorBody; headers?: Record<string, string> } {
   if (error instanceof HttpError) {
     return { httpStatus: error.status, body: { error: { code: error.code, message: error.message } }, headers: error.headers };
   }
   if (error instanceof LlmError) {
-    console.error(`[llm] ${error.code}: ${error.message}`, error.cause instanceof Error ? error.cause.message : '');
+    logger.error(`[llm] ${error.code}: ${error.message}`, error.cause instanceof Error ? error.cause.message : '');
     return { httpStatus: LLM_STATUS[error.code], body: { error: { code: error.code, message: error.message } } };
   }
-  console.error('[api] unexpected error', error);
+  logger.error('[api] unexpected error', error);
   return { httpStatus: 500, body: { error: { code: 'internal', message: 'Unexpected server error' } } };
 }
 

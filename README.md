@@ -303,6 +303,9 @@ npm run dev:api
 # Typecheck every workspace
 npm run typecheck
 
+# Run unit and API integration tests (no real provider or key needed)
+npm test
+
 # Build for production
 npm run build
 

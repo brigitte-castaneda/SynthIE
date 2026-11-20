@@ -16,6 +16,7 @@
     "build": "npm run build --workspaces --if-present && npm run check:secrets",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "preview": "npm run preview -w @synthie/web",
-    "check:secrets": "node scripts/check-bundle-secrets.mjs"
+    "check:secrets": "node scripts/check-bundle-secrets.mjs",
+    "test": "npm run test --workspaces --if-present"
   }
 }

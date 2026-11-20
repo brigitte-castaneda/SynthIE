@@ -74,7 +74,7 @@ function toContents(messages: LlmMessage[]): Content[] {
   }));
 }
 
-function mapGeminiError(error: unknown, signal: AbortSignal): LlmError {
+export function mapGeminiError(error: unknown, signal: AbortSignal): LlmError {
   if (error instanceof ApiError) {
     if (error.status === 429) return new LlmError('provider_rate_limited', 'Gemini rate limit or quota exceeded', { cause: error });
     // Gemini reports a bad key as 400 API_KEY_INVALID rather than 401/403.
